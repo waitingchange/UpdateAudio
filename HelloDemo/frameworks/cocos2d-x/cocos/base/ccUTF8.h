@@ -29,6 +29,7 @@
 #include "platform/CCPlatformMacros.h"
 #include <vector>
 #include <string>
+#include <sstream>
 
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID) 
 #include "platform/android/jni/JniHelper.h"
@@ -38,6 +39,15 @@ NS_CC_BEGIN
 
 namespace StringUtils {
 
+template<typename T>
+std::string toString(T arg)
+{
+    std::stringstream ss;
+    ss << arg;
+    return ss.str();
+}
+
+std::string CC_DLL format(const char* format, ...) CC_FORMAT_PRINTF(1, 2);
 /**
  *  @brief Converts utf8 string to utf16 string.
  *  @param utf8 The utf8 string to be converted.

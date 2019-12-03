@@ -278,7 +278,13 @@ LOCAL_WHOLE_STATIC_LIBRARIES := cocos2dxandroid_static
 # define the macro to compile through support/zip_support/ioapi.c
 LOCAL_CFLAGS   :=  -DUSE_FILE32API
 LOCAL_CFLAGS   +=  -fexceptions
-LOCAL_CPPFLAGS := -Wno-deprecated-declarations -Wno-extern-c-compat
+
+# Issues #9968
+#ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+#    LOCAL_CFLAGS += -DHAVE_NEON=1
+#endif
+
+LOCAL_CPPFLAGS := -Wno-deprecated-declarations
 LOCAL_EXPORT_CFLAGS   := -DUSE_FILE32API
 LOCAL_EXPORT_CPPFLAGS := -Wno-deprecated-declarations -Wno-extern-c-compat
 
@@ -296,7 +302,7 @@ LOCAL_STATIC_LIBRARIES += cocosbuilder_static
 LOCAL_STATIC_LIBRARIES += cocos3d_static
 LOCAL_STATIC_LIBRARIES += spine_static
 LOCAL_STATIC_LIBRARIES += cocos_network_static
-LOCAL_STATIC_LIBRARIES += audioengine_static
+LOCAL_STATIC_LIBRARIES += audio
 
 include $(BUILD_STATIC_LIBRARY)
 #==============================================================

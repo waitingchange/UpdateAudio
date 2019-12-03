@@ -32,17 +32,23 @@ THE SOFTWARE.
 #include "android/asset_manager.h"
 #include "android/asset_manager_jni.h"
 #include "jni/CocosPlayClient.h"
+#include "base/ZipUtils.h"
+
 #include <stdlib.h>
 #include <sys/stat.h>
 
 #define  LOG_TAG    "CCFileUtils-android.cpp"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
 
+#define  ASSETS_FOLDER_NAME          "assets/"
+#define  ASSETS_FOLDER_NAME_LENGTH   7
+
 using namespace std;
 
 NS_CC_BEGIN
 
 AAssetManager* FileUtilsAndroid::assetmanager = nullptr;
+ZipFile* FileUtilsAndroid::obbfile = nullptr;
 
 void FileUtilsAndroid::setassetmanager(AAssetManager* a) {
     if (nullptr == a) {
@@ -74,18 +80,23 @@ FileUtilsAndroid::FileUtilsAndroid()
 
 FileUtilsAndroid::~FileUtilsAndroid()
 {
+    if (obbfile)
+    {
+        delete obbfile;
+        obbfile = nullptr;
+    }
 }
 
 bool FileUtilsAndroid::init()
 {
-    cocosplay::lazyInit();
-    if (cocosplay::isEnabled() && !cocosplay::isDemo())
+  
+
+    _defaultResRootPath = ASSETS_FOLDER_NAME;
+    
+    std::string assetsPath(getApkPath());
+    if (assetsPath.find("/obb/") != std::string::npos)
     {
-        _defaultResRootPath = cocosplay::getGameRoot();
-    }
-    else
-    {
-        _defaultResRootPath = "assets/";
+        obbfile = new ZipFile(assetsPath);
     }
 
     return FileUtils::init();
@@ -145,6 +156,9 @@ std::string FileUtilsAndroid::getNewFilename(const std::string &filename) const
 
 bool FileUtilsAndroid::isFileExistInternal(const std::string& strFilePath) const
 {
+    
+
+
     if (strFilePath.empty())
     {
         return false;
@@ -163,9 +177,14 @@ bool FileUtilsAndroid::isFileExistInternal(const std::string& strFilePath) const
         const char* s = strFilePath.c_str();
 
         // Found "assets/" at the beginning of the path and we don't want it
-        if (strFilePath.find(_defaultResRootPath) == 0) s += strlen("assets/");
-
-        if (FileUtilsAndroid::assetmanager) {
+        if (strFilePath.find(_defaultResRootPath) == 0) s += _defaultResRootPath.length();
+        
+        if (obbfile && obbfile->fileExists(s))
+        {
+            bFound = true;
+        }
+        else if (FileUtilsAndroid::assetmanager)
+        {
             AAsset* aa = AAssetManager_open(FileUtilsAndroid::assetmanager, s, AASSET_MODE_UNKNOWN);
             if (aa)
             {
@@ -243,6 +262,7 @@ bool FileUtilsAndroid::isDirectoryExistInternal(const std::string& dirPath) cons
 
 bool FileUtilsAndroid::isAbsolutePath(const std::string& strPath) const
 {
+
     // On Android, there are two situations for full path.
     // 1) Files in APK, e.g. assets/path/path/file.png
     // 2) Files not in APK, e.g. /data/data/org.cocos2dx.hellocpp/cache/path/path/file.png, or /sdcard/path/path/file.png.

@@ -33,10 +33,14 @@ Copyright (c) 2013-2014 Chukong Technologies Inc.
 #include "base/ccTypes.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <memory>
 #include "jni.h"
 #include "android/asset_manager.h"
 
 NS_CC_BEGIN
+
+class ZipFile;
 
 /**
  * @addtogroup platform
@@ -57,6 +61,7 @@ public:
 
     static void setassetmanager(AAssetManager* a);
     static AAssetManager* getAssetManager() { return assetmanager; }
+    static ZipFile* getObbFile() { return obbfile; }
 
     /* override functions */
     bool init();
@@ -66,10 +71,12 @@ public:
     /** @deprecated Please use FileUtils::getDataFromFile or FileUtils::getStringFromFile instead. */
     CC_DEPRECATED_ATTRIBUTE virtual unsigned char* getFileData(const std::string& filename, const char* mode, ssize_t * size) override;
 
+
     /**
      *  Gets string from a file.
      */
     virtual std::string getStringFromFile(const std::string& filename) override;
+
     
     /**
      *  Creates binary data from a file.
@@ -86,6 +93,7 @@ private:
     Data getData(const std::string& filename, bool forString);
 
     static AAssetManager* assetmanager;
+    static ZipFile* obbfile;
 };
 
 // end of platform group

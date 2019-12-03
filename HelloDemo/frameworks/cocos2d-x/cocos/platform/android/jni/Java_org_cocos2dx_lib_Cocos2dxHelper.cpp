@@ -40,13 +40,17 @@ THE SOFTWARE.
 #define  CLASS_NAME "org/cocos2dx/lib/Cocos2dxHelper"
 #define  EDITBOX_CLASS_NAME "org/cocos2dx/lib/Cocos2dxEditBoxHelper"
 
+static const std::string className = "org.cocos2dx.lib.Cocos2dxHelper";
+
 static EditTextCallback s_editTextCallback = nullptr;
 static void* s_ctx = nullptr;
 
+static int __deviceSampleRate = 44100;
+static int __deviceAudioBufferSizeInFrames = 192;
+
+static std::string g_apkPath;
 using namespace cocos2d;
 using namespace std;
-
-string g_apkPath;
 
 extern "C" {
 
@@ -57,6 +61,12 @@ extern "C" {
     JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxHelper_nativeSetContext(JNIEnv*  env, jobject thiz, jobject context, jobject assetManager) {
         JniHelper::setClassLoaderFrom(context);
         FileUtilsAndroid::setassetmanager(AAssetManager_fromJava(env, assetManager));
+    }
+
+    JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxHelper_nativeSetAudioDeviceInfo(JNIEnv*  env, jobject thiz, jboolean isSupportLowLatency, jint deviceSampleRate, jint deviceAudioBufferSizeInFrames) {
+        __deviceSampleRate = deviceSampleRate;
+        __deviceAudioBufferSizeInFrames = deviceAudioBufferSizeInFrames;
+        LOGD("nativeSetAudioDeviceInfo: sampleRate: %d, bufferSizeInFrames: %d", __deviceSampleRate, __deviceAudioBufferSizeInFrames);
     }
 
     JNIEXPORT void JNICALL Java_org_cocos2dx_lib_Cocos2dxHelper_nativeSetEditTextDialogResult(JNIEnv * env, jobject obj, jbyteArray text) {
@@ -107,7 +117,15 @@ void showDialogJNI(const char * message, const char * title) {
         t.env->DeleteLocalRef(t.classID);
     }
 }
+int getDeviceSampleRate()
+{
+    return __deviceSampleRate;
+}
 
+int getDeviceAudioBufferSizeInFrames()
+{
+    return __deviceAudioBufferSizeInFrames;
+}
 void terminateProcessJNI() {
     JniMethodInfo t;
 
@@ -128,6 +146,30 @@ std::string getPackageNameJNI() {
         t.env->DeleteLocalRef(str);
     }
     return ret;
+}
+int getObbAssetFileDescriptorJNI(const char* path, long* startOffset, long* size) {
+    JniMethodInfo methodInfo;
+    int fd = 0;
+    
+    if (JniHelper::getStaticMethodInfo(methodInfo, className.c_str(), "getObbAssetFileDescriptor", "(Ljava/lang/String;)[J")) {
+        jstring stringArg = methodInfo.env->NewStringUTF(path);
+        jlongArray newArray = (jlongArray)methodInfo.env->CallStaticObjectMethod(methodInfo.classID, methodInfo.methodID, stringArg);
+        jsize theArrayLen = methodInfo.env->GetArrayLength(newArray);
+        
+        if (theArrayLen == 3) {
+            jboolean copy = JNI_FALSE;
+            jlong *array = methodInfo.env->GetLongArrayElements(newArray, &copy);
+            fd = static_cast<int>(array[0]);
+            *startOffset = array[1];
+            *size = array[2];
+            methodInfo.env->ReleaseLongArrayElements(newArray, array, 0);
+        }
+        
+        methodInfo.env->DeleteLocalRef(methodInfo.classID);
+        methodInfo.env->DeleteLocalRef(stringArg);
+    }
+    
+    return fd;
 }
 
 std::string getFileDirectoryJNI() {

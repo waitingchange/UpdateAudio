@@ -27,6 +27,7 @@ package org.cocos2dx.lib;
 
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.util.Log;
 
@@ -52,6 +53,7 @@ public class Cocos2dxMusic {
     private boolean mPaused; // whether music is paused state.
     private boolean mIsLoop = false;
     private boolean mManualPaused = false; // whether music is paused manually before the program is switched to the background.
+    private boolean mIsAudioFocus = true;
     private String mCurrentPath;
 
     // ===========================================================
@@ -148,18 +150,26 @@ public class Cocos2dxMusic {
     }
 
     public void pauseBackgroundMusic() {
-        if (this.mBackgroundMediaPlayer != null && this.mBackgroundMediaPlayer.isPlaying()) {
-            this.mBackgroundMediaPlayer.pause();
-            this.mPaused = true;
-            this.mManualPaused = true;
+        try {
+            if (this.mBackgroundMediaPlayer != null && this.mBackgroundMediaPlayer.isPlaying()) {
+                this.mBackgroundMediaPlayer.pause();
+                this.mPaused = true;
+                this.mManualPaused = true;
+            }
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "pauseBackgroundMusic, IllegalStateException was triggered!");
         }
     }
 
     public void resumeBackgroundMusic() {
-        if (this.mBackgroundMediaPlayer != null && this.mPaused) {
-            this.mBackgroundMediaPlayer.start();
-            this.mPaused = false;
-            this.mManualPaused = false;
+        try {
+            if (this.mBackgroundMediaPlayer != null && this.mPaused) {
+                this.mBackgroundMediaPlayer.start();
+                this.mPaused = false;
+                this.mManualPaused = false;
+            }
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "resumeBackgroundMusic, IllegalStateException was triggered!");
         }
     }
 
@@ -169,13 +179,25 @@ public class Cocos2dxMusic {
         }
     }
 
+    public boolean willPlayBackgroundMusic() {
+        // We will play our own background music, if there isn't already some
+        // music active from some other app (eg the user playing their own
+        // music).
+        AudioManager manager =
+            (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+        return !manager.isMusicActive();
+    }
+
     public boolean isBackgroundMusicPlaying() {
         boolean ret = false;
-
-        if (this.mBackgroundMediaPlayer == null) {
-            ret = false;
-        } else {
-            ret = this.mBackgroundMediaPlayer.isPlaying();
+        try {
+            if (this.mBackgroundMediaPlayer == null) {
+                ret = false;
+            } else {
+                ret = this.mBackgroundMediaPlayer.isPlaying();
+            }
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "isBackgroundMusicPlaying, IllegalStateException was triggered!");
         }
 
         return ret;
@@ -207,24 +229,32 @@ public class Cocos2dxMusic {
         }
 
         this.mLeftVolume = this.mRightVolume = volume;
-        if (this.mBackgroundMediaPlayer != null) {
+        if (this.mBackgroundMediaPlayer != null && mIsAudioFocus) {
             this.mBackgroundMediaPlayer.setVolume(this.mLeftVolume, this.mRightVolume);
         }
     }
 
     public void onEnterBackground(){
-        if (this.mBackgroundMediaPlayer != null && this.mBackgroundMediaPlayer.isPlaying()) {
-            this.mBackgroundMediaPlayer.pause();
-            this.mPaused = true;
+        try {
+            if (this.mBackgroundMediaPlayer != null && this.mBackgroundMediaPlayer.isPlaying()) {
+                this.mBackgroundMediaPlayer.pause();
+                this.mPaused = true;
+            }
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "onEnterBackground, IllegalStateException was triggered!");
         }
     }
     
     public void onEnterForeground(){
-        if(!this.mManualPaused){
-            if (this.mBackgroundMediaPlayer != null && this.mPaused) {
-                this.mBackgroundMediaPlayer.start();
-                this.mPaused = false;
+        try {
+            if (!this.mManualPaused) {
+                if (this.mBackgroundMediaPlayer != null && this.mPaused) {
+                    this.mBackgroundMediaPlayer.start();
+                    this.mPaused = false;
+                }
             }
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "onEnterForeground, IllegalStateException was triggered!");
         }
     }
     
@@ -256,8 +286,13 @@ public class Cocos2dxMusic {
                 mediaPlayer.setDataSource(fis.getFD());
                 fis.close();
             } else {
-                final AssetFileDescriptor assetFileDescritor = this.mContext.getAssets().openFd(path);
-                mediaPlayer.setDataSource(assetFileDescritor.getFileDescriptor(), assetFileDescritor.getStartOffset(), assetFileDescritor.getLength());
+                if (Cocos2dxHelper.getObbFile() != null) {
+                    final AssetFileDescriptor assetFileDescriptor = Cocos2dxHelper.getObbFile().getAssetFileDescriptor(path);
+                    mediaPlayer.setDataSource(assetFileDescriptor.getFileDescriptor(), assetFileDescriptor.getStartOffset(), assetFileDescriptor.getLength());
+                } else {
+                    final AssetFileDescriptor assetFileDescriptor = this.mContext.getAssets().openFd(path);
+                    mediaPlayer.setDataSource(assetFileDescriptor.getFileDescriptor(), assetFileDescriptor.getStartOffset(), assetFileDescriptor.getLength());
+                }
             }
 
             mediaPlayer.prepare();
@@ -269,6 +304,16 @@ public class Cocos2dxMusic {
         }
 
         return mediaPlayer;
+    }
+
+    void setAudioFocus(boolean isFocus) {
+        mIsAudioFocus = isFocus;
+
+        if (mBackgroundMediaPlayer != null) {
+            float lVolume = mIsAudioFocus ? mLeftVolume : 0.0f;
+            float rVolume = mIsAudioFocus ? mRightVolume : 0.0f;
+            mBackgroundMediaPlayer.setVolume(lVolume, rVolume);
+        }
     }
 
     // ===========================================================
